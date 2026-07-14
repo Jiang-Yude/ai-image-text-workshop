@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
+<title>AI 圖文實作 · 嘉我好漾 7/14</title>
+<style>
+  :root {
+    --bg-1: #F5EDE7; --bg-2: #EFEBE9; --bg-3: #E8DED9; --bg-4: #D7CCC8;
+    --bg-5: #C9BAB1; --bg-6: #B5A199; --bg-7: #8B6F5C; --bg-8: #5D4037; --bg-9: #3E2723;
+    --text-on-light:#4E342E; --text-on-mid:#F5EDE0; --text-on-dark:#F5EDE0;
+    --text-soft-light:#5D4037; --text-soft-dark: rgba(245,237,224,0.80);
+    --accent:#D88C3A; --accent-light:#D4A574; --accent-on-dark:#E6B87D;
+    --subtle-light:#BCAAA4; --subtle-dark: rgba(245,237,224,0.18);
+    --font-display: "PingFang TC","Noto Sans TC","Inter","Helvetica Neue",system-ui,sans-serif;
+    --font-body:    "PingFang TC","Noto Sans TC","Inter",system-ui,sans-serif;
+    --font-mono:    "JetBrains Mono","SF Mono",ui-monospace,monospace;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin:0; font-family:var(--font-body); background:var(--bg-1); -webkit-font-smoothing:antialiased; }
+
+  section {
+    position: relative; min-height: 100vh;
+    display: flex; flex-direction: column;
+    padding: 96px 56px; isolation: isolate;
+    border-radius: 32px 32px 0 0; box-shadow: 0 -24px 60px -20px rgba(40, 24, 16, 0.18);
+  }
+  section:first-of-type { border-radius: 0; box-shadow: none; }
+  section[data-bg="1"] { background: var(--bg-1); z-index: 1; color: var(--text-on-light); }
+  section[data-bg="2"] { background: var(--bg-2); z-index: 2; color: var(--text-on-light); }
+  section[data-bg="3"] { background: var(--bg-3); z-index: 3; color: var(--text-on-light); }
+  section[data-bg="4"] { background: var(--bg-4); z-index: 4; color: var(--text-on-light); }
+  section[data-bg="5"] { background: var(--bg-5); z-index: 5; color: var(--text-on-light); }
+  section[data-bg="6"] { background: var(--bg-6); z-index: 6; color: var(--text-on-light); }
+  section[data-bg="7"] { background: var(--bg-7); z-index: 7; color: var(--text-on-dark); }
+  section[data-bg="8"] { background: var(--bg-8); z-index: 8; color: var(--text-on-dark); }
+  section[data-bg="9"] { background: var(--bg-9); z-index: 9; color: var(--text-on-dark); }
+
+  .act-cap { font-family:var(--font-mono); font-size:13px; letter-spacing:0.22em; text-transform:uppercase;
+    font-weight:700; color:var(--accent); margin-bottom:28px; display:inline-flex; align-items:center; gap:12px; }
+  .act-cap::before { content:""; width:28px; height:1px; background:var(--accent); }
+  section[data-bg="7"] .act-cap, section[data-bg="8"] .act-cap, section[data-bg="9"] .act-cap { color: var(--accent-on-dark); }
+  section[data-bg="7"] .act-cap::before, section[data-bg="8"] .act-cap::before, section[data-bg="9"] .act-cap::before { background: var(--accent-on-dark); }
+
+  .display { font-family:var(--font-display); font-size:clamp(48px,8vw,112px); line-height:1.0; font-weight:800; letter-spacing:-0.03em; margin:0 0 24px; }
+  .display.sm { font-size:clamp(34px,5vw,68px); }
+  .h1 { font-family:var(--font-display); font-size:clamp(26px,3.4vw,40px); line-height:1.25; font-weight:700; margin:0 0 20px; }
+  .h2 { font-size:21px; line-height:1.3; font-weight:600; margin:0 0 8px; }
+  .lead { font-size:clamp(19px,1.7vw,23px); line-height:1.7; color:var(--text-soft-light); max-width:800px; margin:0 auto; }
+  section[data-bg="7"] .lead, section[data-bg="8"] .lead, section[data-bg="9"] .lead { color: var(--text-soft-dark); }
+  .body { font-size:18px; line-height:1.7; color:var(--text-soft-light); }
+  section[data-bg="7"] .body, section[data-bg="8"] .body, section[data-bg="9"] .body { color: var(--text-soft-dark); }
+  .mono-note { font-family:var(--font-mono); font-size:14px; letter-spacing:0.12em; color:var(--accent); margin-top:40px; }
+  section[data-bg="7"] .mono-note, section[data-bg="8"] .mono-note, section[data-bg="9"] .mono-note { color: var(--accent-on-dark); }
+
+  .wrap { width:100%; max-width:1080px; text-align:center; margin:auto; }
+  .wrap.left { text-align:left; }
+
+  .dot-indicator { position:fixed; right:28px; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:14px; z-index:100; }
+  .dot-indicator a { width:10px; height:10px; border-radius:50%; background:rgba(78,52,46,0.22); transition:all .35s cubic-bezier(.22,1,.36,1); position:relative; }
+  .dot-indicator a:hover { background:rgba(78,52,46,0.5); }
+  .dot-indicator a.active { background:var(--accent); transform:scale(1.5); box-shadow:0 0 0 4px rgba(216,140,58,0.18); }
+  .dot-indicator a .lbl { position:absolute; right:22px; top:50%; transform:translateY(-50%); font-family:var(--font-mono); font-size:11px; letter-spacing:.15em; color:var(--text-soft-light); white-space:nowrap; opacity:0; transition:opacity .25s; pointer-events:none; }
+  .dot-indicator a:hover .lbl { opacity:1; }
+  .dot-indicator.scrolling a.active .lbl { opacity:1; }
+  body.on-dark .dot-indicator a { background:rgba(245,237,224,0.25); }
+  body.on-dark .dot-indicator a.active { background:var(--accent-on-dark); box-shadow:0 0 0 4px rgba(230,184,125,0.22); }
+  body.on-dark .dot-indicator a .lbl { color:var(--text-soft-dark); }
+
+  .progress { position:fixed; top:0; left:0; height:3px; width:0%; background:linear-gradient(90deg,var(--accent),var(--accent-light)); z-index:200; transition:width .15s linear; }
+
+  .font-ctl { position:fixed; left:20px; bottom:20px; z-index:150; display:flex; gap:6px; }
+  .font-ctl button { font-family:var(--font-mono); font-size:13px; font-weight:700; width:40px; height:34px;
+    border:1px solid var(--subtle-light); background:rgba(255,248,240,0.85); color:var(--text-on-light);
+    border-radius:8px; cursor:pointer; }
+  .font-ctl button:hover { border-color:var(--accent); color:var(--accent); }
+
+  .grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:24px; margin-top:44px; }
+  .grid-2 { display:grid; grid-template-columns:repeat(2,1fr); gap:24px; margin-top:36px; }
+  .card { background:rgba(255,248,240,0.5); border:1px solid var(--subtle-light); border-radius:16px; padding:28px 26px; text-align:left; transition:transform .3s,box-shadow .3s; backdrop-filter:blur(8px); }
+  .card:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(78,52,46,0.1); }
+  .card .num { font-family:var(--font-mono); font-size:14px; letter-spacing:0.18em; color:var(--accent); font-weight:700; margin-bottom:12px; }
+  section[data-bg="7"] .card, section[data-bg="8"] .card, section[data-bg="9"] .card { background:rgba(255,248,240,0.06); border-color:var(--subtle-dark); }
+  section[data-bg="7"] .card .num, section[data-bg="8"] .card .num, section[data-bg="9"] .card .num { color:var(--accent-on-dark); }
+
+  .quote { font-family:var(--font-display); font-size:clamp(26px,3.4vw,42px); line-height:1.5; font-weight:600; max-width:880px; margin:0 auto; letter-spacing:-0.01em; }
+  .quote::before { content:"「"; color:var(--accent); margin-right:4px; }
+  .quote::after { content:"」"; color:var(--accent); margin-left:4px; }
+  section[data-bg="7"] .quote::before,section[data-bg="7"] .quote::after,section[data-bg="8"] .quote::before,section[data-bg="8"] .quote::after,section[data-bg="9"] .quote::before,section[data-bg="9"] .quote::after { color:var(--accent-on-dark); }
+
+  .timeline { display:grid; grid-template-columns:repeat(5,1fr); gap:0; margin-top:52px; position:relative; }
+  .timeline.t4 { grid-template-columns:repeat(4,1fr); }
+  .timeline::before { content:""; position:absolute; top:18px; left:8%; right:8%; height:1px; background:repeating-linear-gradient(90deg,var(--subtle-light) 0,var(--subtle-light) 6px,transparent 6px,transparent 12px); }
+  section[data-bg="7"] .timeline::before,section[data-bg="8"] .timeline::before,section[data-bg="9"] .timeline::before { background:repeating-linear-gradient(90deg,var(--subtle-dark) 0,var(--subtle-dark) 6px,transparent 6px,transparent 12px); }
+  .step { text-align:center; position:relative; padding:56px 12px 0; }
+  .step .dot { position:absolute; top:0; left:50%; transform:translateX(-50%); width:36px; height:36px; background:var(--accent); color:#fff; border-radius:50%; font-family:var(--font-mono); font-weight:700; font-size:14px; display:grid; place-items:center; box-shadow:0 0 0 6px rgba(216,140,58,0.18); }
+  section[data-bg="7"] .step .dot,section[data-bg="8"] .step .dot,section[data-bg="9"] .step .dot { background:var(--accent-on-dark); color:var(--bg-9); box-shadow:0 0 0 6px rgba(230,184,125,0.22); }
+
+  .btn { display:inline-block; padding:16px 36px; background:var(--accent); color:#fff; border-radius:999px; text-decoration:none; font-weight:700; letter-spacing:0.04em; font-size:17px; transition:all .3s; margin-top:28px; }
+  .btn:hover { background:var(--text-on-light); transform:translateY(-2px); }
+  section[data-bg="7"] .btn:hover,section[data-bg="8"] .btn:hover,section[data-bg="9"] .btn:hover { background:var(--accent-on-dark); color:var(--bg-9); }
+
+  .trybox { margin-top:18px; border-left:4px solid var(--accent); border-radius:0 12px 12px 0; padding:14px 20px; text-align:left; background:rgba(216,140,58,0.08); font-size:17px; line-height:1.7; color:var(--text-soft-light); }
+  .trybox b { color:var(--text-on-light); }
+  .trybox a { color:var(--accent); font-weight:700; }
+  section[data-bg="7"] .trybox, section[data-bg="8"] .trybox, section[data-bg="9"] .trybox { background:rgba(230,184,125,0.10); border-left-color:var(--accent-on-dark); color:var(--text-soft-dark); }
+  section[data-bg="7"] .trybox b, section[data-bg="8"] .trybox b, section[data-bg="9"] .trybox b { color:var(--text-on-dark); }
+  section[data-bg="7"] .trybox a, section[data-bg="8"] .trybox a, section[data-bg="9"] .trybox a { color:var(--accent-on-dark); }
+
+  .workshop { margin-top:40px; border:2px dashed var(--accent); border-radius:16px; padding:24px 28px; text-align:left; background:rgba(216,140,58,0.06); }
+  .workshop .wk-label { font-family:var(--font-mono); font-size:13px; letter-spacing:0.2em; font-weight:700; color:var(--accent); margin-bottom:10px; }
+  .workshop p { margin:6px 0; font-size:18px; line-height:1.7; }
+  section[data-bg="7"] .workshop, section[data-bg="8"] .workshop, section[data-bg="9"] .workshop { background:rgba(230,184,125,0.08); border-color:var(--accent-on-dark); }
+  section[data-bg="7"] .workshop .wk-label, section[data-bg="8"] .workshop .wk-label, section[data-bg="9"] .workshop .wk-label { color:var(--accent-on-dark); }
+
+  details { margin-top:20px; text-align:left; background:rgba(255,248,240,0.45); border:1px solid var(--subtle-light); border-radius:12px; padding:14px 20px; }
+  details summary { cursor:pointer; font-weight:700; font-size:17px; color:var(--text-on-light); }
+  details p, details li { font-size:17px; line-height:1.75; color:var(--text-soft-light); }
+  section[data-bg="7"] details, section[data-bg="8"] details, section[data-bg="9"] details { background:rgba(255,248,240,0.06); border-color:var(--subtle-dark); }
+  section[data-bg="7"] details summary, section[data-bg="8"] details summary, section[data-bg="9"] details summary { color:var(--text-on-dark); }
+  section[data-bg="7"] details p, section[data-bg="7"] details li, section[data-bg="8"] details p, section[data-bg="8"] details li, section[data-bg="9"] details p, section[data-bg="9"] details li { color:var(--text-soft-dark); }
+
+  table.pagetype { width:100%; max-width:760px; margin:36px auto 0; border-collapse:collapse; text-align:left; font-size:18px; }
+  table.pagetype th, table.pagetype td { padding:14px 18px; border-bottom:1px solid var(--subtle-dark); }
+  table.pagetype th { font-family:var(--font-mono); font-size:13px; letter-spacing:0.18em; color:var(--accent-on-dark); text-transform:uppercase; }
+  table.pagetype td { color:var(--text-soft-dark); line-height:1.6; }
+  table.pagetype td b { color:var(--text-on-dark); }
+
+  .footer-grid { display:grid; grid-template-columns:2fr 1fr 1fr; gap:56px; text-align:left; margin-top:56px; max-width:1080px; width:100%; }
+  .footer-grid h3 { font-size:13px; letter-spacing:0.2em; text-transform:uppercase; color:var(--accent-on-dark); margin:0 0 16px; font-family:var(--font-mono); }
+  .footer-grid ul { list-style:none; padding:0; margin:0; }
+  .footer-grid li { padding:6px 0; font-size:16px; color:var(--text-soft-dark); }
+  .footer-bottom { margin-top:64px; padding-top:24px; border-top:1px solid var(--subtle-dark); width:100%; max-width:1080px; font-family:var(--font-mono); font-size:13px; letter-spacing:0.15em; color:rgba(245,237,224,0.6); text-align:center; }
+
+  .reveal { opacity:1; transform:translateY(0) scale(1); }
+  .js-on .reveal:not(.in) { opacity:0; transform:translateY(36px) scale(0.96); }
+  .reveal { transition:opacity .8s cubic-bezier(.22,1,.36,1),transform .8s cubic-bezier(.22,1,.36,1); }
+  .reveal.d1 { transition-delay:.08s; } .reveal.d2 { transition-delay:.16s; } .reveal.d3 { transition-delay:.24s; } .reveal.d4 { transition-delay:.32s; }
+
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto; } .reveal { opacity:1 !important; transform:none !important; } }
+  @media (max-width: 720px) {
+    section { padding:80px 24px; border-radius:24px 24px 0 0; }
+    .grid-3,.grid-2,.timeline,.timeline.t4 { grid-template-columns:1fr; gap:18px; }
+    .timeline::before { display:none; }
+    .footer-grid { grid-template-columns:1fr; gap:32px; }
+    .dot-indicator { display:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="progress" id="progress"></div>
+
+  <nav class="dot-indicator" aria-label="章節導覽">
+    <a href="#act-01" data-i="0"><span class="lbl">01 · 封面</span></a>
+    <a href="#act-02" data-i="1"><span class="lbl">02 · 今天的路線圖</span></a>
+    <a href="#act-03" data-i="2"><span class="lbl">03 · 回顧上週</span></a>
+    <a href="#act-035" data-i="3"><span class="lbl">04 · 好消息 ChatGPT Work</span></a>
+    <a href="#act-04" data-i="4"><span class="lbl">05 · 定位變技能包</span></a>
+    <a href="#act-05" data-i="5"><span class="lbl">06 · 靈感池快速一站</span></a>
+    <a href="#act-06" data-i="6"><span class="lbl">07 · 社群圖文（上半場主菜）</span></a>
+    <a href="#act-055" data-i="7"><span class="lbl">08 · 下半場：問答與補課示範</span></a>
+    <a href="#act-07" data-i="8"><span class="lbl">09 · 導購著陸頁</span></a>
+    <a href="#act-08" data-i="9"><span class="lbl">10 · 影片與代操</span></a>
+    <a href="#act-09" data-i="10"><span class="lbl">11 · 收尾與資源包</span></a>
+  </nav>
+
+  <div class="font-ctl" aria-label="字級調整">
+    <button data-f="-">A−</button><button data-f="0">A</button><button data-f="+">A＋</button>
+  </div>
+
+  <!-- ACT 01 封面 -->
+  <section id="act-01" data-block data-bg="1">
+    <div class="wrap">
+      <div class="act-cap reveal">嘉我好漾 線上青創課 · 7/14（二）19:00–21:00</div>
+      <h1 class="display reveal d1">AI 圖文實作</h1>
+      <p class="lead reveal d2">讓 AI 圖不要有 AI 味 ｜ 江昱德．江江教練 ｜ 隱性知識提煉師 × AI 應用規劃師</p>
+      <div class="grid-3" style="max-width:920px; margin-left:auto; margin-right:auto;">
+        <div class="card reveal d2"><div class="num">①</div><h3 class="h2">品牌放進 prompt</h3><p class="body">做出別人複製不走的圖卡。</p></div>
+        <div class="card reveal d3"><div class="num">②</div><h3 class="h2">一個主題批量做完</h3><p class="body">圖卡、海報、簡報、貼文一次出。</p></div>
+        <div class="card reveal d3"><div class="num">③</div><h3 class="h2">做出你的導購著陸頁</h3><p class="body">加上影片要不要找代操的判斷。</p></div>
+      </div>
+      <p class="mono-note reveal d4">↓ 今天不講理論：我直接打開 ChatGPT，從頭做一遍給你看 ↓</p>
+    </div>
+  </section>
+
+  <!-- ACT 02 今天的路線圖 -->
+  <section id="act-02" data-block data-bg="2">
+    <div class="wrap">
+      <div class="act-cap reveal">ACT 02 · 今天的路線圖</div>
+      <h2 class="display sm reveal d1">五站，一條路<br/>每站的產出都是下一站的原料</h2>
+      <p class="lead reveal d2">上週訓練了 AI 小編，今天讓它把品牌「做出來、看得見」。整堂課我全程現場示範，你看完就知道整條路怎麼走，每一段都有可以直接抄走的做法。</p>
+      <div class="timeline">
+        <div class="step reveal d1"><div class="dot">01</div><h3 class="h2">品牌定位</h3><p class="body">你是誰、幫誰解決什麼。</p></div>
+        <div class="step reveal d1"><div class="dot">02</div><h3 class="h2">做成技能包</h3><p class="body">定位存成固定文件，AI 每次從認識你開始。</p></div>
+        <div class="step reveal d2"><div class="dot">03</div><h3 class="h2">靈感池</h3><p class="body">題目從這裡撈，不用每次從零想。</p></div>
+        <div class="step reveal d3"><div class="dot">04</div><h3 class="h2">社群圖文</h3><p class="body">有你味道的圖卡，批量產出。</p></div>
+        <div class="step reveal d4"><div class="dot">05</div><h3 class="h2">導購著陸頁</h3><p class="body">發文引流之後，把人接住的那一頁。</p></div>
+      </div>
+      <p class="mono-note reveal d4">五站走完，每一站的產出都存在你手上，串起來就是你的品牌資產。</p>
+    </div>
+  </section>
+
+  <!-- ACT 03 回顧上週 -->
+  <section id="act-03" data-block data-bg="3">
+    <div class="wrap">
+      <div class="act-cap reveal">ACT 03 · 回顧上週 ｜ 作業回收</div>
+      <h2 class="display sm reveal d1">你的 AI 小編<br/>上週學會了這些</h2>
+      <div class="grid-3">
+        <div class="card reveal d1"><div class="num">上週 01</div><h3 class="h2">桌面版 AI 小編</h3><p class="body">Codex：把 AI 請進電腦，安全設定、問卷變簡報的第一個工作流。</p></div>
+        <div class="card reveal d2"><div class="num">上週 02</div><h3 class="h2">技能包＋工作日誌</h3><p class="body">技能包是給 AI 的操作手冊；工作日誌讓 AI 記住你。</p></div>
+        <div class="card reveal d3"><div class="num">上週 03</div><h3 class="h2">靈感池</h3><p class="body">素材丟給小編，下標籤、生靈感詞，發文穩定又有個人特色。</p></div>
+      </div>
+      <div class="trybox reveal d3">🎁 上次來不及講的「五種開頭公式」直接送：<a href="https://ai-km-jiang.vercel.app/skills.html#title-rewriter" target="_blank" rel="noopener">改標題 title-rewriter 技能包</a>，五種開頭＋風險評估都在裡面，裝了就能用，今天不佔上課時間。</div>
+      <div class="workshop reveal d3">
+        <div class="wk-label">▶ 作業回收 · 3 分鐘</div>
+        <p>上週課後有實際動手的（發文、建靈感池、玩 Codex），聊天室喊一聲，抽 1 到 2 位講講狀況。</p>
+      </div>
+      <div class="trybox reveal d4">🙋 沒上過第一堂的別擔心：今天每一站都從頭做，跟著做就補上了。</div>
+    </div>
+  </section>
+
+  <!-- ACT 3.5 好消息：ChatGPT Work -->
+  <section id="act-035" data-block data-bg="3">
+    <div class="wrap">
+      <div class="act-cap reveal">ACT 04 · 開工前的好消息 ｜ ChatGPT Work</div>
+      <h2 class="display sm reveal d1">裝不了 Codex？<br/>現在可以用 ChatGPT Work 跟著做</h2>
+      <p class="lead reveal d2">上週有人卡在安裝。好消息：電腦沒辦法裝 Codex 的人，用 ChatGPT Work 一樣可以跟著今天的流程走。今天我就全程用網頁版示範，讓每個人都跟得上。</p>
+      <div class="trybox reveal d2">❓ ChatGPT Work 是什麼：ChatGPT 裡的工作模式，用你平常的 ChatGPT 帳號、同一個入口就找得到，不用另外裝軟體。等一下現場直接帶大家看在哪裡點。</div>
+      <details class="reveal d2"><summary>⚡ 三分鐘看懂 Work（上週五講座的精華）</summary>
+        <p><b>Chat 跟 Work，差一顆技能包按鈕</b>：Work 模式讓網頁版 AI 也能掛技能包，今天做的品牌技能包就掛在這裡。</p>
+        <p><b>提示詞它愛聽不聽，技能包是操作手冊</b>：每次重打提示詞，AI 想不想照做看心情；技能包是白紙黑字的手冊，約束力完全不同。</p>
+        <p><b>專案存資料，技能包存判斷</b>：你的品牌素材、過去文章放專案；你的定位、風格、判斷標準做成技能包。今天兩個都會用到。</p>
+        <p><b>兩個雷點先打預防針</b>：技能包做完要實際掛上測一次才算數；專案資料塞太雜 AI 會撈錯，照今天教的分類放。</p>
+      </details>
+      <div class="grid-3">
+        <div class="card reveal d1"><div class="num">工作量判斷 01</div><h3 class="h2">能用 Codex 就用 Codex</h3><p class="body">可以裝的人強烈推薦：AI 直接在你電腦裡幹活，省掉很多麻煩。</p></div>
+        <div class="card reveal d2"><div class="num">工作量判斷 02</div><h3 class="h2">網頁版適合簡單的事</h3><p class="body">工作單純，網頁版就夠用，不用勉強折騰安裝。</p></div>
+        <div class="card reveal d3"><div class="num">工作量判斷 03</div><h3 class="h2">越複雜，終究要進桌面</h3><p class="body">東西全放網頁版，之後要搬到桌面會很辛苦（資料轉移）。早點想清楚放哪裡。</p></div>
+      </div>
+      <p class="mono-note reveal d4">一句話：簡單的事網頁版，長期的事進桌面。今天先用網頁版把整條路走通。</p>
+    </div>
+  </section>
+
+  <!-- ACT 04 第一站：品牌定位 → 技能包 -->
+  <section id="act-04" data-block data-bg="4">
+    <div class="wrap">
+      <div class="act-cap reveal">ACT 05 · 第一站 ｜ 品牌定位與風格，做成你的技能包</div>
+      <h2 class="display sm reveal d1">AI 認識你<br/>才能幫你</h2>
+      <p class="lead reveal d2">AI 產出千篇一律，是因為你每次都從零自我介紹。把「你是誰、你長什麼樣子」做成固定資產，AI 每次都從認識你開始。這份資產，就是你自己的第一個技能包（白話：一份 AI 每次開工前先讀的「你的說明書」）。</p>
+      <div class="timeline t4">
+        <div class="step reveal d1"><div class="dot">01</div><h3 class="h2">聊定位</h3><p class="body">AI 當顧問一次問一題，把你在解決什麼挖出來。</p></div>
+        <div class="step reveal d2"><div class="dot">02</div><h3 class="h2">提煉風格</h3><p class="body">配色、色碼、喜歡的海報與排版，固定下來。</p></div>
+        <div class="step reveal d3"><div class="dot">03</div><h3 class="h2">整成資產</h3><p class="body">價值主張、產品、定位、受眾、策略，一份文件。</p></div>
+        <div class="step reveal d4"><div class="dot">04</div><h3 class="h2">存成技能包</h3><p class="body">之後跟品牌相關的事，AI 都來這裡找你。</p></div>
+      </div>
+      <div class="workshop reveal d2">
+        <div class="wk-label">▶ 風格提煉提示詞 · 直接複製</div>
+        <p><b>「你是我的品牌風格顧問，一次問我一個問題，幫我把視覺風格定下來：①我喜歡的顏色與配色？②我有沒有已經喜歡的海報、圖表或網頁（我會貼給你看）？③如果我有官網或既有素材，請幫我提煉出品牌色碼（HEX）。最後整理成一份『品牌風格設定』，包含主色、輔色色碼、字體感覺、構圖偏好。」</b></p>
+        <p>💡 公司已經有官網的人最快：把官網丟給 AI，直接請它提煉企業色碼。之後所有圖卡都用色碼鎖住，風格就不會跑。</p>
+      </div>
+      <div class="workshop reveal d2">
+        <div class="wk-label">▶ 版本 A：單純提示詞 · 直接複製</div>
+        <p><b>「我想整理我的品牌定位，請你當顧問，一次問我一個問題：我在幫誰解決什麼問題？我跟做同樣事情的人差在哪？客人會怎麼跟朋友介紹我？把答案整理成我的品牌定位三句話。」</b></p>
+        <p>💡 加速技巧：已經有在發文的人，直接把你的 Threads／IG／粉專貼文丟給 AI（或給它連結請它讀），叫它「從我過去的發文提煉我的品牌定位與說話風格」。你發過的每一篇文，都是 AI 認識你的原料。</p>
+      </div>
+      <details class="reveal d3"><summary>🎬 版本 B：找一位名人數位分身陪你聊（我用納瓦爾示範）</summary>
+        <p>同一題「幫我看品牌定位」，我自己喜歡納瓦爾，就找「<a href="https://ai-km-jiang.vercel.app/skills.html#naval-ravikant-skill" target="_blank" rel="noopener">納瓦爾數位分身</a>」陪聊。差別在：數位分身自帶一整套判斷框架（槓桿、獨特性、長期賽局），會追問你沒想到的問題。</p>
+        <p><b>怎麼挑你的對標名人</b>：找一位你想對標的企業家或名人。夠有名的，很容易找到現成技能包，或直接請 AI 上網爬他的資料、用他的價值觀跟你對話。不夠有名的（例如你很喜歡的某位老師），就自己動手蒐集：買他的書、整理你的讀書心得、他講過的名言、他推薦過的東西，餵給 AI 做成他的思維包。</p>
+        <p>🎁 自己動手做的工具：<a href="https://ai-km-jiang.vercel.app/skills.html#persona-mind-distiller" target="_blank" rel="noopener">人格思維提煉技能包</a>，把一個人的公開內容提煉成可以對話的思維模型。</p>
+      </details>
+      <details class="reveal d3"><summary>🐱 我的示範：咪卡當品牌代言人＋三視圖</summary>
+        <p>我的品牌代言人是咪卡：做了三視圖（正面、側面、背面）把角色定死，加上固定配色與排版偏好，全部存進品牌技能包。之後每張圖卡都認得出是我。</p>
+      </details>
+      <details class="reveal d4"><summary>📦 技能包要拆還是合？</summary>
+        <p>都可以，但不熟練時<b>建議先拆開</b>：品牌定位一包、圖文風格一包。哪裡有問題就修哪一包，不會互相干擾。而且可以混用：圖文技能包單獨拿出來，不是只有工作上才能用。內容不用寫到機密，大概讓 AI 認識你、幫得上你就好。</p>
+      </details>
+      <div class="workshop reveal d4">
+        <div class="wk-label">▶ 跟著做</div>
+        <p>1. 用上面的提示詞跟 AI 聊定位與風格。</p>
+        <p>2. 請 AI 整理成「品牌設定檔」（定位＋風格＋色碼），存起來。</p>
+        <p>3. 聊天室貼「一句品牌定位」。</p>
+      </div>
+      <div class="trybox reveal d4">🎁 想挖得更深：<a href="https://ai-km-jiang.vercel.app/skills.html#implicit-knowledge-extractor-lite" target="_blank" rel="noopener">隱性知識提煉師 初階免費版</a>，回家讓 AI 帶你把「你跟別人差在哪」問到底。</div>
+    </div>
+  </section>
+
+  <!-- ACT 05 第二站：靈感池再做一次 -->
+  <section id="act-05" data-block data-bg="5">
+    <div class="wrap">
+      <div class="act-cap reveal">ACT 06 · 快速一站 ｜ 靈感池，題目從這裡撈</div>
+      <h2 class="display sm reveal d1">靈感靠平常存<br/>用的時候撈</h2>
+      <p class="lead reveal d2">上週講過原理，今天直接再做一次：把剛剛的品牌設定檔加上隨手素材丟給小編，讓它下標籤、生出 5 個靈感詞。這 5 個靈感詞，等一下就是圖文和著陸頁的題目來源。</p>
+      <div class="grid-2">
+        <div class="card reveal d1"><div class="num">路線 A</div><h3 class="h2">有 Codex 的人</h3><p class="body">一個資料夾就是一個工作現場：素材丟進去，讓小編讀完、整理成有標籤的靈感清單。</p></div>
+        <div class="card reveal d2"><div class="num">路線 B</div><h3 class="h2">只有網頁版的人</h3><p class="body">ChatGPT 對話版一樣能做：素材貼上去，請它生「靈感詞＋標籤」。兩條路今天都示範。</p></div>
+      </div>
+      <div class="workshop reveal d3">
+        <div class="wk-label">▶ 跟著做 · 這句直接複製</div>
+        <p><b>「這裡是我的品牌設定檔跟一些零散筆記。請幫每一則下 2 到 3 個標籤，把同主題的聚在一起，最後給我 5 個這週可以發文的靈感詞。」</b></p>
+      </div>
+      <div class="trybox reveal d4">📖 靈感池的完整版：官網文章〈<a href="https://ai-km-jiang.vercel.app/articles/teacher-prep-knowledge-workflow/" target="_blank" rel="noopener">講師如何用知識管理流程，把備課變成可複用系統</a>〉。我自己每堂課、每篇文的靈感，都是照這套八階段流程在養的。</div>
+    </div>
+  </section>
+
+  <!-- ACT 06 第三站：社群圖文 (dark) -->
+  <section id="act-06" data-block data-bg="6">
+    <div class="wrap">
+      <div class="act-cap reveal">ACT 07 · 上半場主菜 ｜ 社群圖文：品牌放進 prompt</div>
+      <h2 class="display sm reveal d1">模板化是品牌資產<br/>套版是 AI 味</h2>
+      <p class="lead reveal d2">工具只是末端。把品牌設定檔塞進 prompt，才是別人複製不走的部分。同樣用模板，差別在裡面有沒有你。</p>
+      <div class="grid-3">
+        <div class="card reveal d1"><div class="num">去 AI 味 01</div><h3 class="h2">設定檔進 prompt</h3><p class="body">第一站的品牌設定檔直接放進生圖指令，口吻與客群跟著你。</p></div>
+        <div class="card reveal d2"><div class="num">去 AI 味 02</div><h3 class="h2">視覺風格綁定</h3><p class="body">固定顏色、構圖、人設，每張卡都認得出是你。</p></div>
+        <div class="card reveal d3"><div class="num">去 AI 味 03</div><h3 class="h2">三種圖卡情境</h3><p class="body">金句卡、知識卡、生活感卡，一套風格三種用途。</p></div>
+      </div>
+      <details class="reveal d3"><summary>✅ 去 AI 味三檢查（至少中兩個才算過）</summary>
+        <p>① 有沒有你品牌獨有的場景、物件或人設？② 文字和視覺是不是對同一群受眾說話？③ 遮住品牌名，還認得出是你嗎？</p>
+      </details>
+      <div class="workshop reveal d3">
+        <div class="wk-label">▶ 去 AI 味起手式 · 直接複製</div>
+        <p><b>「用我的品牌設定檔生成這張圖卡。要求：①用我的品牌色碼，不要用預設的藍紫漸層；②不要 3D 立體感、不要科技感光暈、不要玻璃質感；③場景用我實際的工作環境（我會附照片或描述給你）；④文字用台灣口語，不要翻譯腔。」</b></p>
+        <p>💡 最有效的一招：把你店裡、工作室的實際照片餵給 AI 當參考，AI 味立刻掉一半。檢查不過就回頭改這段指令，哪一條破了補哪一條。</p>
+      </div>
+      <details class="reveal d3"><summary>🐱 現場示範：我的咪卡輪播卡</summary>
+        <p>我自己的輪播圖卡，主角是固定人設「咪卡」：同一隻角色、同一套配色、同一種構圖。先給你們看整組成品，再現場做其中一張，示範「固定人設＋固定風格」怎麼讓人一眼認出這是你的卡。</p>
+      </details>
+      <div class="workshop reveal d3">
+        <div class="wk-label">▶ 一個主題批量做完＋一鍵改尺寸 · 直接複製</div>
+        <p>先想清楚要推什麼（新品、活動、品牌曝光），再一次量產：</p>
+        <p><b>「用我的品牌設定檔＋這個主題，一次產出：①IG 正方形圖卡（1:1）②FB 橫式貼文圖（16:9）③A4 海報文案版型（直式）④一則社群貼文文字。四個格式訊息一致、用同一套色碼與風格。」</b></p>
+        <p>💡 已經在用 Canva 的人：圖做好丟進 Canva 用「Magic Resize 一鍵改尺寸」換平台格式，最快。兩條路都通，訊息一致最重要。</p>
+      </div>
+      <div class="workshop reveal d4">
+        <div class="wk-label">▶ 跟著做 · 今晚保證完成品</div>
+        <p>1. 從你的靈感詞挑一個當主題，順手填「內容出口卡」三格：<b>這則內容要導誰？導去哪一頁？進頁後希望他做什麼？</b>（等一下著陸頁直接用）</p>
+        <p>2. 套講師的 prompt 模板（設定檔＋風格），生出 1 張圖卡初稿。</p>
+        <p>3. 聊天室貼圖卡連結，我點 2 到 3 個共通問題。第二張是回家作業。</p>
+        <p>🛟 卡住的人：聊天室貼「品牌一句話＋主題」就好，最後 6 分鐘我現場套模板幫你跑一次。</p>
+      </div>
+      <div class="trybox reveal d4">🛠 工具地圖一句話：ChatGPT 生圖首選、Canva 排版備用、Codex 讓小編幫你跑。工具兩個月換一輪，方法不變。</div>
+      <p class="mono-note reveal d4">做到這裡差不多一小時。休息 10 分鐘，回來進下半場：導購著陸頁。</p>
+    </div>
+  </section>
+
+  <!-- ACT 6.5 中場互動：模擬學生補課 (dark) -->
+  <section id="act-055" data-block data-bg="6">
+    <div class="wrap">
+      <div class="act-cap reveal">ACT 08 · 下半場開場 ｜ 有問題嗎？沒有的話看我示範補課</div>
+      <h2 class="display sm reveal d1">聽不懂老師在講什麼？<br/>我示範怎麼叫 AI 幫我補課</h2>
+      <p class="lead reveal d2">下半場開場，先誠實回收：第一堂加今天上半場，有沒有聽不懂、不會用的？問題多，我們就集中火力解決；沒問題，看我示範怎麼用 AI 把老師的資料變成你的家教。我的技能包、Agent、文章教學都做好放在官網了，重點是你要會用。</p>
+      <div class="grid-2">
+        <div class="card reveal d1"><div class="num">回收提問 01</div><h3 class="h2">靈感詞，有人回去試了嗎？</h3><p class="body">試了的聊天室打 1，卡住的打 2，忘記這是什麼的打 3。</p></div>
+        <div class="card reveal d2"><div class="num">回收提問 02</div><h3 class="h2">一篇內容變多種內容，試了嗎？</h3><p class="body">同一個想法改成不同開頭、不同格式。試過的打 1。</p></div>
+      </div>
+      <div class="workshop reveal d3">
+        <div class="wk-label">▶ 講師現場模擬：我是聽不懂的學生</div>
+        <p>我現在假裝自己是上週的學員：「老師上次好像講了什麼改標題、什麼發文表，我聽不懂也不會用。」看我怎麼做：</p>
+        <p><b>「這是老師上課的簡報內容（整份複製貼上）。我是上過課但沒聽懂的學生，請你當我的家教：①用白話重新教我『改標題』那段；②一步一步帶我用我自己的內容做一次。」</b></p>
+        <p>💡 這招對所有課都有效：任何講義、簡報、文章，聽不懂就整份餵給 AI，叫它當你的家教教到會。</p>
+      </div>
+      <div class="trybox reveal d4">🙋 現場開放提問：上次或今天到目前為止，有什麼沒聽懂、不會用的，現在問。沒人提問的話，我就直接示範「一週發文規劃表」：一個內容改七種開頭、七天怎麼排，做一份給大家看。</div>
+    </div>
+  </section>
+
+  <!-- ACT 07 第四站：導購著陸頁 (dark) -->
+  <section id="act-07" data-block data-bg="7">
+    <div class="wrap">
+      <div class="act-cap reveal">ACT 09 · 下半場主菜 ｜ 導購著陸頁：參考別人版型，改成自己的風格</div>
+      <h2 class="display sm reveal d1">不知道怎麼設計？<br/>先抓別人的版型</h2>
+      <p class="lead reveal d2">發文引流之後，總要有一頁把人接住。第一步還是從學習開始：把你喜歡的導購頁交給 AI 幫你拆，再參考它的版型做自己的。版型可以參考，放進去的品牌是你自己的。</p>
+      <div class="workshop reveal d1">
+        <div class="wk-label">▶ 先學習：請 AI 幫你分析導購頁 · 直接複製</div>
+        <p><b>「這是一個我很喜歡的導購頁（貼連結或截圖）。請幫我分析：①它的區塊順序與資訊層級為什麼有效？②它在哪些位置放行動按鈕、用什麼話術？③再對比我目前的頁面（或我還沒有頁面），我跟它的差距在哪、我該先補哪三件事？」</b></p>
+      </div>
+      <table class="pagetype reveal d1">
+        <tr><th>你要做什麼</th><th>用哪種頁</th></tr>
+        <tr><td>活動、報名</td><td><b>著陸頁</b></td></tr>
+        <tr><td>賣產品</td><td><b>產品介紹頁</b></td></tr>
+        <tr><td>個人品牌</td><td><b>形象頁</b></td></tr>
+        <tr><td>內容、服務整理成一頁</td><td><b>目錄頁</b></td></tr>
+      </table>
+      <div class="workshop reveal d2">
+        <div class="wk-label">▶ 現場示範 · 參考版型改風格的那句話</div>
+        <p>找一個你覺得好的頁面，連同你的品牌設定檔＋內容出口卡三格一起丟給 AI：</p>
+        <p><b>「參考這個頁面的版型結構（區塊順序、資訊層級、留白節奏、行動按鈕位置），內容全部換成我的品牌（設定檔如下），生成一頁 HTML。」</b></p>
+        <p>⚠️ 界線：只參考結構。別人的文案、品牌名、照片、案例、價格，一律不搬。</p>
+        <p>現場從頭生一頁導購著陸頁，示範怎麼改文案、改風格。其他三種頁型比較差異＋給 prompt 範本，回家自己套。</p>
+      </div>
+      <div class="trybox reveal d3">🎨 不知道什麼算好版型？現場我直接用<a href="https://www.apple.com/" target="_blank" rel="noopener">蘋果官網</a>示範：全世界最會賣產品的頁面之一，版型結構乾淨、資訊層級清楚。丟給 AI 說「參考這頁的版型結構」就能開工。進階版型庫：<a href="https://github.com/alchaincyf/huashu-design" target="_blank" rel="noopener">花叔 Huashu Design</a>（Personal License，商用前注意授權）。</div>
+      <div class="trybox reveal d3">🚀 做好的頁怎麼免費上線：<a href="https://github.com/Jiang-Yude/deploy-ai-webpage-public" target="_blank" rel="noopener">網頁部署技能包</a>，照著做就能把 HTML 變成可以分享的網址。</div>
+      <div class="trybox reveal d4">🧪 上線前先壓測：<a href="https://github.com/Jiang-Yude/ai-consumer-validation" target="_blank" rel="noopener">AI 消費者驗證技能包（SSR）</a>，讓 AI 模擬你的目標客群看這一頁，把拒買理由先挑出來。很吃 token，建議付費版再上。</div>
+      <details class="reveal d4"><summary>✏️ 超實用小技巧：網頁局部改稿</summary>
+        <p>網頁生出來只想改一句話？先叫 AI 把網頁存成檔案再改：「只改第一屏的標題那一句，其他地方都不要動」。留在聊天框裡每改一次都是整頁重生，容易把你滿意的地方改壞。改完再請它列出「這次動了哪幾行」，自己核對。</p>
+      </details>
+      <details class="reveal d4"><summary>🔭 頁做好之後：4O，讓人和 AI 都找得到你</summary>
+        <p>以前做頁面是讓人搜得到你（SEO）；現在還要讓 AI 讀得懂你、願意引用你、推薦你、甚至代替客人來跟你辦事。這一整套我叫它 <b>4O：SEO＋AIO＋GEO＋AXO</b>。今天先種概念，完整版看官網文章：〈<a href="https://ai-km-jiang.vercel.app/articles/market-to-ai/" target="_blank" rel="noopener">可以學「用 AI 行銷」，還可以學「對 AI 行銷」</a>〉。</p>
+      </details>
+      <p class="mono-note reveal d4">頁做出來，你的圖文、你的發文、你累積的受眾，全都有地方落腳。這一頁就是你的品牌主場。</p>
+    </div>
+  </section>
+
+  <!-- ACT 08 影片與代操 (dark) -->
+  <section id="act-08" data-block data-bg="8">
+    <div class="wrap">
+      <div class="act-cap reveal">ACT 10 · 附帶判斷 ｜ 影片與代操</div>
+      <h2 class="display sm reveal d1">圖文<br/>新手一人公司最划算的賽道</h2>
+      <div class="grid-3">
+        <div class="card reveal d1"><div class="num">判斷 01</div><h3 class="h2">真人實拍太捲</h3><p class="body">要團隊、要梗、要長期穩定，是 2 到 3 天工作坊的事。</p></div>
+        <div class="card reveal d2"><div class="num">判斷 02</div><h3 class="h2">AI 生成又貴又扣分</h3><p class="body">成本高，大陸腔在台灣市場是扣分項。</p></div>
+        <div class="card reveal d3"><div class="num">判斷 03</div><h3 class="h2">圖文最划算</h3><p class="body">產出輕、修改快、累積快，新手一人公司的最佳賽道。</p></div>
+      </div>
+      <p class="quote reveal d4" style="margin-top:48px; font-size:clamp(22px,2.8vw,34px);">沒概念就找代操，等於把錢丟水溝；真做起來了，直接找行銷顧問公司，不要自己研究自動化。</p>
+      <details class="reveal d4" style="max-width:760px; margin-left:auto; margin-right:auto;"><summary>📋 代操自我判斷三格（帶走的表）</summary>
+        <p>① 還沒有穩定產品 → 先不要代操，先做今天這套。</p>
+        <p>② 已有主題、想測流量 → 用今天的圖文＋著陸頁自己先測。</p>
+        <p>③ 已有素材、預算、目標 → 才有資格談代操。今天的產出，就是投放前要備好的素材。</p>
+      </details>
+      <p class="mono-note reveal d4">影片可以做，先把圖文的基本盤顧好。等你有穩定內容和受眾，再往影片延伸。</p>
+    </div>
+  </section>
+
+  <!-- ACT 09 收尾與資源包 (dark) -->
+  <section id="act-09" data-block data-bg="9">
+    <div class="wrap left">
+      <div class="act-cap reveal">ACT 11 · 收尾 ｜ 全部存在你自己手上</div>
+      <h2 class="display sm reveal d1" style="text-align:left;">定位 → 技能包 → 靈感池<br/>→ 圖文 → 導購頁</h2>
+      <p class="lead reveal d2" style="text-align:left;">今天走完的這條路，每一站的產出都存在你自己手上，這就是品牌資產。流水的 AI 工具，鐵打的知識庫。</p>
+      <div class="grid-2" style="margin-top:32px;">
+        <div class="card reveal d2"><div class="num">📝 回家作業</div><h3 class="h2">二選一</h3><p class="body">用今天的流程做出第二張圖卡；或把你自己的導購著陸頁生出來。做完發 Threads 或貼到社群，出去做、出去發。</p></div>
+        <div class="card reveal d3"><div class="num">📅 接下來</div><h3 class="h2">持續做、持續累積</h3><p class="body">品牌技能包、靈感池、圖文、著陸頁都留在自己手上。做得越久，你的品牌資產長得越厚。</p></div>
+      </div>
+      <div class="grid-3" style="margin-top:28px;">
+        <div class="card reveal d1"><div class="num">🎁 資源 01</div><h3 class="h2"><a href="https://ai-km-jiang.vercel.app/articles/teacher-prep-knowledge-workflow/" target="_blank" rel="noopener" style="color:var(--accent-on-dark);">靈感池教學文章</a></h3><p class="body">八階段知識流程完整版，靈感池怎麼建、怎麼養。</p></div>
+        <div class="card reveal d2"><div class="num">🎁 資源 02</div><h3 class="h2"><a href="https://github.com/Jiang-Yude/deploy-ai-webpage-public" target="_blank" rel="noopener" style="color:var(--accent-on-dark);">網頁部署技能包</a></h3><p class="body">做好的著陸頁免費上線，照步驟做就有網址。</p></div>
+        <div class="card reveal d3"><div class="num">🎁 資源 03</div><h3 class="h2"><a href="https://github.com/Jiang-Yude/ai-consumer-validation" target="_blank" rel="noopener" style="color:var(--accent-on-dark);">AI 消費者驗證（SSR）</a></h3><p class="body">圖卡與著陸頁上線前，AI 模擬客群幫你挑毛病。吃 token，付費版再上。</p></div>
+      </div>
+      <div class="grid-2" style="margin-top:24px; max-width:760px;">
+        <div class="card reveal d3"><div class="num">🎁 資源 04</div><h3 class="h2"><a href="https://github.com/alchaincyf/huashu-design" target="_blank" rel="noopener" style="color:var(--accent-on-dark);">花叔 Huashu Design</a></h3><p class="body">版型參考庫。Personal License，商用前注意授權。</p></div>
+        <div class="card reveal d4"><div class="num">🎁 資源 05</div><h3 class="h2"><a href="https://ai-km-jiang.vercel.app/skills.html" target="_blank" rel="noopener" style="color:var(--accent-on-dark);">官網技能包總覽</a></h3><p class="body">所有公開技能包一頁看完，含改標題、真實需求調查法。</p></div>
+      </div>
+      <div class="footer-grid">
+        <div class="reveal d1">
+          <h3>今晚的一句話</h3>
+          <p class="body">版型可以參考別人的，品牌一定是你自己的。把你的定位做成技能包，AI 產出從此有你的味道。</p>
+        </div>
+        <div class="reveal d2">
+          <h3>兩堂課串起來</h3>
+          <ul>
+            <li>7/8 訓練 AI 小編（認識你）</li>
+            <li>7/14 把品牌做出來（看得見）</li>
+            <li>之後：持續發、持續累積品牌資產</li>
+          </ul>
+        </div>
+        <div class="reveal d3">
+          <h3>找到我</h3>
+          <ul>
+            <li><a href="https://ai-km-jiang.vercel.app/" target="_blank" rel="noopener" style="color:var(--text-soft-dark);">知識官網（更多文章與技能包）</a></li>
+            <li>Threads ＠jiang_yude_coach</li>
+            <li>方格子 Jiang_Coach</li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom reveal d4">嘉我好漾 線上青創課 · 7/14 AI 圖文實作 · 江昱德｜江江教練</div>
+    </div>
+  </section>
+
+<script>
+(function () {
+  document.documentElement.classList.add('js-on');
+  document.body.classList.add('js-on');
+  const sections = [...document.querySelectorAll('section[data-block]')];
+  const dots = [...document.querySelectorAll('.dot-indicator a')];
+  const progress = document.getElementById('progress');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reducedMotion) {
+    const io = new IntersectionObserver((entries) => entries.forEach((e) => {
+      if (e.isIntersecting) { e.target.querySelectorAll('.reveal').forEach((el) => el.classList.add('in')); }
+    }), { threshold: 0.25 });
+    sections.forEach((s) => io.observe(s));
+  } else { document.querySelectorAll('.reveal').forEach((el) => el.classList.add('in')); }
+  const darkBgs = new Set(['7','8','9']);
+  const navIo = new IntersectionObserver((entries) => entries.forEach((e) => {
+    if (e.isIntersecting) {
+      const i = sections.indexOf(e.target);
+      dots.forEach((d, idx) => d.classList.toggle('active', idx === i));
+      document.body.classList.toggle('on-dark', darkBgs.has(e.target.getAttribute('data-bg')));
+    }
+  }), { threshold: 0.55 });
+  sections.forEach((s) => navIo.observe(s));
+  const scroller = document.scrollingElement || document.documentElement;
+  let ticking = false;
+  function updateProgress() {
+    const max = scroller.scrollHeight - scroller.clientHeight;
+    const pct = max > 0 ? (scroller.scrollTop / max) * 100 : 0;
+    progress.style.width = pct + '%'; ticking = false;
+  }
+  const dotNav = document.querySelector('.dot-indicator');
+  let hideTimer = null;
+  window.addEventListener('scroll', () => {
+    if (!ticking) { requestAnimationFrame(updateProgress); ticking = true; }
+    if (dotNav) {
+      dotNav.classList.add('scrolling');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => dotNav.classList.remove('scrolling'), 1100);
+    }
+  }, { passive: true });
+  updateProgress();
+  let zoom = 1;
+  document.querySelectorAll('.font-ctl button').forEach((b) => b.addEventListener('click', () => {
+    const f = b.dataset.f;
+    zoom = f === '+' ? Math.min(1.4, zoom + 0.1) : f === '-' ? Math.max(0.8, zoom - 0.1) : 1;
+    document.body.style.zoom = zoom;
+  }));
+})();
+</script>
+</body>
+</html>
